@@ -95,7 +95,7 @@ class ROSPlanKbUpdaterMachineInfo {
 	{
 		svc_update_knowledge_ =
 			n.serviceClient<rosplan_knowledge_msgs::KnowledgeUpdateServiceArray>
-			("kcl_rosplan/update_knowledge_base_array", /* persistent */ true);
+			("rosplan_knowledge_base/update_array", /* persistent */ true);
 
 		ROS_INFO("[RPKB-MachineInfo] Waiting for ROSPlan service update_knowledge_base");
 		svc_update_knowledge_.waitForExistence();
@@ -106,8 +106,8 @@ class ROSPlanKbUpdaterMachineInfo {
 	{
 		svc_current_knowledge_ =
 			n.serviceClient<rosplan_knowledge_msgs::GetAttributeService>
-			("kcl_rosplan/get_current_knowledge", /* persistent */ true);
-		ROS_INFO("[RPKB-MachineInfo] Waiting for ROSPlan service get_current_knowledge");
+			("rosplan_knowledge_base/state/propositions", /* persistent */ true);
+		ROS_INFO("[RPKB-MachineInfo] Waiting for ROSPlan service rosplan_knowledge_base/state/propositions");
 		svc_current_knowledge_.waitForExistence();
 	}
 
@@ -116,7 +116,7 @@ class ROSPlanKbUpdaterMachineInfo {
 	{
 		svc_current_instances_ =
 			n.serviceClient<rosplan_knowledge_msgs::GetInstanceService>
-			("kcl_rosplan/get_current_instances", /* persistent */ true);
+			("rosplan_knowledge_base/state/instances", /* persistent */ true);
 		ROS_INFO("[RPKB-MachineInfo] Waiting for ROSPlan service get_current_instances");
 		svc_current_instances_.waitForExistence();
 	}
@@ -125,12 +125,12 @@ class ROSPlanKbUpdaterMachineInfo {
 	get_predicates()
 	{
 		// fetch and store predicate details
-		ros::service::waitForService("kcl_rosplan/get_domain_predicate_details",ros::Duration(20));
+		ros::service::waitForService("rosplan_knowledge_base/domain/predicate_details",ros::Duration(20));
 		ros::ServiceClient pred_client =
 			n.serviceClient<rosplan_knowledge_msgs::GetDomainPredicateDetailsService>
-			  ("kcl_rosplan/get_domain_predicate_details", /* persistent */ true);
+			  ("rosplan_knowledge_base/domain/predicate_details", /* persistent */ true);
 		if (! pred_client.waitForExistence(ros::Duration(20))) {
-			ROS_ERROR("[RPKB-MachineInfo] No service provider for get_domain_predicate_details");
+			ROS_ERROR("[RPKB-MachineInfo] No service provider for rosplan_knowledge_base/domain/predicate_details");
 			return;
 		}
 
@@ -191,8 +191,9 @@ class ROSPlanKbUpdaterMachineInfo {
 									              }
 								              }
 							              });
-
+							remsrv.request.update_type.push_back(rosplan_knowledge_msgs::KnowledgeUpdateServiceArrayRequest::REMOVE_KNOWLEDGE);
 							remsrv.request.knowledge.push_back(a);
+							addsrv.request.update_type.push_back(rosplan_knowledge_msgs::KnowledgeUpdateServiceArrayRequest::ADD_KNOWLEDGE);
 							addsrv.request.knowledge.push_back(new_a);
 						}
 						// we do NOT break here, by this, we also remove any additional
@@ -215,6 +216,7 @@ class ROSPlanKbUpdaterMachineInfo {
 						              kv.key = ev.first; kv.value = ev.second;
 						              new_a.values.push_back(kv);
 					              });
+					addsrv.request.update_type.push_back(rosplan_knowledge_msgs::KnowledgeUpdateServiceArrayRequest::ADD_KNOWLEDGE);
 					addsrv.request.knowledge.push_back(new_a);
 					ROS_INFO("[RPKB-MachineInfo] Adding '%s' info for %s", predicate_name.c_str(), idvar_value.c_str());
 				}
@@ -264,7 +266,8 @@ class ROSPlanKbUpdaterMachineInfo {
 				{
 					// there is a mismatch, we need to update, always update all
 					std::for_each(act_attributes.begin(), act_attributes.end(),
-					              [&remsrv](const auto &a) { remsrv.request.knowledge.push_back(a); });
+					              [&remsrv](const auto &a) { remsrv.request.update_type.push_back(rosplan_knowledge_msgs::KnowledgeUpdateServiceArrayRequest::REMOVE_KNOWLEDGE);
+remsrv.request.knowledge.push_back(a); });
 
 					std::for_each(valvar_values.begin(), valvar_values.end(),
 					              [&addsrv,&predicate_name,&idvar_name,&idvar_value,&valvar_name](const auto &v) {
@@ -276,6 +279,7 @@ class ROSPlanKbUpdaterMachineInfo {
 						              new_a.values.push_back(kv);
 						              kv.key = valvar_name; kv.value = v;
 						              new_a.values.push_back(kv);
+								addsrv.request.update_type.push_back(rosplan_knowledge_msgs::KnowledgeUpdateServiceArrayRequest::ADD_KNOWLEDGE);
 						              addsrv.request.knowledge.push_back(new_a);
 					              });
 				}
@@ -321,7 +325,8 @@ class ROSPlanKbUpdaterMachineInfo {
 					ROS_INFO("[RPKB-MachineInfo] *** Updating %s", predicate_name.c_str());
 					// there is a mismatch, we need to update, always update all
 					std::for_each(act_attributes.begin(), act_attributes.end(),
-					              [&remsrv](const auto &a) { remsrv.request.knowledge.push_back(a); });
+					              [&remsrv](const auto &a) { remsrv.request.update_type.push_back(rosplan_knowledge_msgs::KnowledgeUpdateServiceArrayRequest::REMOVE_KNOWLEDGE);
+remsrv.request.knowledge.push_back(a); });
 
 					std::for_each(expected_values.begin(), expected_values.end(),
 					              [&addsrv,&predicate_name](const auto &exp_args) {
@@ -334,6 +339,7 @@ class ROSPlanKbUpdaterMachineInfo {
 							              kv.value = arg.second;
 							              new_a.values.push_back(kv);
 						              }
+								addsrv.request.update_type.push_back(rosplan_knowledge_msgs::KnowledgeUpdateServiceArrayRequest::ADD_KNOWLEDGE);
 						              addsrv.request.knowledge.push_back(new_a);
 					              });
 				}
@@ -368,6 +374,7 @@ class ROSPlanKbUpdaterMachineInfo {
 				new_i.knowledge_type = rosplan_knowledge_msgs::KnowledgeItem::INSTANCE;
 				new_i.instance_type = cfg_machine_instance_type_;
 				new_i.instance_name = m.name;
+				addsrv.request.update_type.push_back(rosplan_knowledge_msgs::KnowledgeUpdateServiceArrayRequest::ADD_KNOWLEDGE);
 				addsrv.request.knowledge.push_back(new_i);
 				ROS_INFO("[RPKB-MachineInfo] Adding missing instance '%s - %s'",
 				         new_i.instance_name.c_str(), new_i.instance_type.c_str());
@@ -405,8 +412,6 @@ class ROSPlanKbUpdaterMachineInfo {
 
 		rosplan_knowledge_msgs::KnowledgeUpdateServiceArray remsrv;
 		rosplan_knowledge_msgs::KnowledgeUpdateServiceArray addsrv;
-		remsrv.request.update_type = rosplan_knowledge_msgs::KnowledgeUpdateServiceArrayRequest::REMOVE_KNOWLEDGE;
-		addsrv.request.update_type = rosplan_knowledge_msgs::KnowledgeUpdateServiceArrayRequest::ADD_KNOWLEDGE;
 
 		std::vector<std::map<std::string, std::string>> rs_expected_values;
 		for (const rcll_ros_msgs::Machine &m : msg->machines) {

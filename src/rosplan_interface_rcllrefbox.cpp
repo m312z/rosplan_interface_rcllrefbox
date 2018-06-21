@@ -63,10 +63,8 @@ class ROSPlanInterfaceRCLLRefBox {
 	ROSPlanInterfaceRCLLRefBox(ros::NodeHandle &n)
 		: n(n)
 	{
-		sub_action_dispatch_ = n.subscribe("kcl_rosplan/action_dispatch", 10,
-		                                   &ROSPlanInterfaceRCLLRefBox::action_dispatch_cb, this);
-		pub_action_feedback_ =
-			n.advertise<rosplan_dispatch_msgs::ActionFeedback>("kcl_rosplan/action_feedback", 10, true);
+		sub_action_dispatch_ = n.subscribe("rosplan_plan_dispatcher/action_dispatch", 10, &ROSPlanInterfaceRCLLRefBox::action_dispatch_cb, this);
+		pub_action_feedback_ = n.advertise<rosplan_dispatch_msgs::ActionFeedback>("rosplan_plan_dispatcher/action_feedback", 10, true);
 
 		create_svc_update_knowledge();
 		create_svc_refbox_prepare();
@@ -137,10 +135,7 @@ class ROSPlanInterfaceRCLLRefBox {
 	void
 	create_svc_update_knowledge()
 	{
-		svc_update_knowledge_ =
-			n.serviceClient<rosplan_knowledge_msgs::KnowledgeUpdateServiceArray>
-			("kcl_rosplan/update_knowledge_base_array", /* persistent */ true);
-
+		svc_update_knowledge_ = n.serviceClient<rosplan_knowledge_msgs::KnowledgeUpdateServiceArray>("rosplan_knowledge_base/update_array", /* persistent */ true);
 		ROS_INFO("[RPI-RefBox] Waiting for ROSPlan service update_knowledge_base");
 		svc_update_knowledge_.waitForExistence();
 	}
@@ -148,10 +143,7 @@ class ROSPlanInterfaceRCLLRefBox {
 	void
 	create_svc_refbox_prepare()
 	{
-		svc_refbox_prepare_ =
-			n.serviceClient<rcll_ros_msgs::SendPrepareMachine>("rcll/send_prepare_machine",
-			                                                   /* persistent */ true);
-
+		svc_refbox_prepare_ = n.serviceClient<rcll_ros_msgs::SendPrepareMachine>("rcll/send_prepare_machine", /* persistent */ true);
 		ROS_INFO("[RPI-RefBox] Waiting for RCLL refbox service send_prepare_machine");
 		svc_refbox_prepare_.waitForExistence();
 	}
@@ -159,21 +151,15 @@ class ROSPlanInterfaceRCLLRefBox {
 	void
 	get_action_spec(const std::string &name)
 	{
-		ros::ServiceClient opdetail_client =
-			n.serviceClient<rosplan_knowledge_msgs::GetDomainOperatorDetailsService>
-			  ("kcl_rosplan/get_domain_operator_details");
-		//ROS_INFO("[RPI-RefBox] Waiting for ROSPlan service get_domain_operator_details");
-		if (! opdetail_client.waitForExistence(ros::Duration(10))) {
-			ROS_ERROR("[RPI-RefBox] Could not discover get_domain_operator_details service "
-			          "(for action spec '%s')", name.c_str());
+		ros::ServiceClient opdetail_client = n.serviceClient<rosplan_knowledge_msgs::GetDomainOperatorDetailsService>("rosplan_knowledge_base/domain/operator_details");
+		if (! opdetail_client.waitForExistence(ros::Duration(120))) {
+			ROS_ERROR("[RPI-RefBox] Could not discover rosplan_knowledge_base/domain/operator_details service (for action spec '%s')", name.c_str());
 			return;
 		}
 		rosplan_knowledge_msgs::GetDomainOperatorDetailsService srv;
 		srv.request.name = name;
 		if (opdetail_client.call(srv)) {
 			bool has_robot_var = false;
-
-			//ROS_INFO("[RPI-RefBox] Parsing get_domain_operator_details response");
 			std::set<std::string> reqp;
 			for (const auto &p : srv.response.op.formula.typed_parameters) {
 				reqp.insert(p.key);
@@ -189,9 +175,7 @@ class ROSPlanInterfaceRCLLRefBox {
 	void
 	get_action_specs()
 	{
-		ros::ServiceClient oplist_client =
-			n.serviceClient<rosplan_knowledge_msgs::GetDomainOperatorService>
-			  ("kcl_rosplan/get_domain_operators");
+		ros::ServiceClient oplist_client = n.serviceClient<rosplan_knowledge_msgs::GetDomainOperatorService>("rosplan_knowledge_base/domain/operators");
 		if (! oplist_client.waitForExistence(ros::Duration(120))) {
 			ROS_ERROR("[RPI-RefBox] Could not retrieve action specs from ROSPlan");
 			return;
@@ -216,11 +200,9 @@ class ROSPlanInterfaceRCLLRefBox {
 		get_predicates();
 	}
 	
-	void collect_predicates(std::set<std::string> &predicate_names,
-	                        const std::vector<rosplan_knowledge_msgs::DomainFormula> &df)
+	void collect_predicates(std::set<std::string> &predicate_names, const std::vector<rosplan_knowledge_msgs::DomainFormula> &df)
 	{
-		std::for_each(df.begin(), df.end(),
-		              [&predicate_names](auto &f) { predicate_names.insert(f.name); });
+		std::for_each(df.begin(), df.end(), [&predicate_names](auto &f) { predicate_names.insert(f.name); });
 	}
 
 	void
@@ -242,11 +224,9 @@ class ROSPlanInterfaceRCLLRefBox {
 		}
 
 		// fetch and store predicate details
-		ros::service::waitForService("kcl_rosplan/get_domain_predicate_details",ros::Duration(20));
-		ros::ServiceClient pred_client =
-			n.serviceClient<rosplan_knowledge_msgs::GetDomainPredicateDetailsService>
-			  ("kcl_rosplan/get_domain_predicate_details", /* persistent */ true);
-		if (! pred_client.waitForExistence(ros::Duration(20))) {
+		ros::service::waitForService("rosplan_knowledge_base/domain/predicate_details",ros::Duration(20));
+		ros::ServiceClient pred_client = n.serviceClient<rosplan_knowledge_msgs::GetDomainPredicateDetailsService>("rosplan_knowledge_base/domain/predicate_details", /* persistent */ true);
+		if (! pred_client.waitForExistence(ros::Duration(120))) {
 			ROS_ERROR("[RPI-RefBox] No service provider for get_domain_predicate_details");
 			return;
 		}
@@ -293,6 +273,8 @@ class ROSPlanInterfaceRCLLRefBox {
 			ROS_INFO("[RPI-RefBox] Unknown or ignored action %s called, ignoring", name.c_str());
 			return;
 		}
+
+		ROS_INFO("[RPI-RefBox] Action %s called", name.c_str());
 
 		std::set<std::string> params;
 		std::for_each(msg->parameters.begin(), msg->parameters.end(),
@@ -463,8 +445,6 @@ class ROSPlanInterfaceRCLLRefBox {
 		rosplan_knowledge_msgs::KnowledgeUpdateServiceArray remsrv;
 		rosplan_knowledge_msgs::KnowledgeUpdateServiceArray addsrv;
 
-		remsrv.request.update_type = rosplan_knowledge_msgs::KnowledgeUpdateServiceArrayRequest::REMOVE_KNOWLEDGE;
-		addsrv.request.update_type = rosplan_knowledge_msgs::KnowledgeUpdateServiceArrayRequest::ADD_KNOWLEDGE;
 
 		proc_predicate_updates(rosplan_knowledge_msgs::KnowledgeUpdateServiceArray::Request::REMOVE_KNOWLEDGE,
 		                       specs_[name].op.at_start_del_effects, bound_params, remsrv, addsrv);
@@ -561,10 +541,12 @@ class ROSPlanInterfaceRCLLRefBox {
 			if (op == rosplan_knowledge_msgs::KnowledgeUpdateServiceArray::Request::ADD_KNOWLEDGE) {
 				ROS_INFO("[RPI-RefBox] Asserting (%s%s)",
 				         item.attribute_name.c_str(), param_str.c_str());
+				addsrv.request.update_type.push_back(rosplan_knowledge_msgs::KnowledgeUpdateServiceArrayRequest::ADD_KNOWLEDGE);
 				addsrv.request.knowledge.push_back(item);
 			} else {
 				ROS_INFO("[RPI-RefBox] Retracting (%s%s)",
 				         item.attribute_name.c_str(), param_str.c_str());
+				remsrv.request.update_type.push_back(rosplan_knowledge_msgs::KnowledgeUpdateServiceArrayRequest::REMOVE_KNOWLEDGE);
 				remsrv.request.knowledge.push_back(item);
 			}
 		}
