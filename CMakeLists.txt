@@ -112,9 +112,9 @@ target_link_libraries(rosplan_kb_updater_rcll_order_info
 # )
 
 ## Mark executables and/or libraries for installation
-# install(TARGETS rosplan_interface_rcllrefbox rosplan_interface_rcllrefbox_node
-#   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+ install(TARGETS rosplan_interface_rcllrefbox rosplan_kb_updater_rcll_machine_info rosplan_kb_updater_rcll_order_info
+   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+ )
 
