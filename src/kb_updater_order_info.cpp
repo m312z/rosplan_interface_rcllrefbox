@@ -278,6 +278,7 @@ class ROSPlanKbUpdaterOrderInfo {
 						              kv.key = ev.first; kv.value = ev.second;
 						              new_a.values.push_back(kv);
 					              });
+					addsrv.request.update_type.push_back(rosplan_knowledge_msgs::KnowledgeUpdateServiceArrayRequest::ADD_KNOWLEDGE);
 					addsrv.request.knowledge.push_back(new_a);
 					ROS_INFO("[RPKB-OrdInfo] Adding '%s' info for %s", predicate_name.c_str(), idvar_value.c_str());
 				}
